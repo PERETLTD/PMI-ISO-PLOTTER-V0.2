@@ -1,0 +1,258 @@
+:root {
+  --ink: #132039;
+  --panel: #f5f1e7;
+  --paper: #fffefb;
+  --frame: #d8ceb9;
+  --grid: #b8b8b8;
+  --shadow: rgba(16, 28, 46, 0.18);
+  --brand: #1f3f96;
+  --brand-deep: #172e6f;
+  --accent: #ea580c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Avenir Next", "Trebuchet MS", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(234, 88, 12, 0.18), transparent 28%),
+    linear-gradient(135deg, #f9f3e8 0%, #eee6d6 45%, #d7e2ef 100%);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 24px;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.panel {
+  padding: 24px;
+  border: 1px solid rgba(19, 32, 57, 0.08);
+  border-radius: 28px;
+  background: rgba(255, 252, 245, 0.88);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 48px var(--shadow);
+}
+
+.brand-lockup {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.logo-card {
+  width: 180px;
+  height: auto;
+  display: block;
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgba(31, 63, 150, 0.18);
+  background: #1f3f96;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+
+h1,
+h2,
+.help p,
+label,
+button,
+output {
+  margin: 0;
+}
+
+h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.lede {
+  margin-top: 12px;
+  line-height: 1.5;
+  color: rgba(19, 32, 57, 0.82);
+}
+
+.control-group,
+.help,
+.actions {
+  margin-top: 24px;
+}
+
+.control-group label,
+.help h2 {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tool-button.active {
+  background: linear-gradient(135deg, var(--brand), #365bc4);
+}
+
+input[type="color"] {
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(19, 32, 57, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  font: inherit;
+  color: var(--ink);
+}
+
+output {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: rgba(19, 32, 57, 0.7);
+}
+
+.toggle-group {
+  display: grid;
+  gap: 12px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+}
+
+button {
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-deep);
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  box-shadow: 0 10px 20px rgba(23, 46, 111, 0.18);
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button.secondary {
+  color: var(--ink);
+  background: #d9dddf;
+  box-shadow: none;
+}
+
+button.primary {
+  background: linear-gradient(135deg, var(--accent), #f08d1d);
+}
+
+.help {
+  padding-top: 18px;
+  border-top: 1px solid rgba(19, 32, 57, 0.12);
+}
+
+.help p {
+  margin-top: 10px;
+  line-height: 1.5;
+  color: rgba(19, 32, 57, 0.82);
+}
+
+kbd {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #e7e0d0;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.board-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.paper-frame {
+  width: min(100%, 960px);
+  padding: 18px;
+  border-radius: 34px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(235, 227, 213, 0.95)),
+    linear-gradient(135deg, #f7f2e7, #dcd5c7);
+  box-shadow: 0 30px 80px var(--shadow);
+}
+
+.canvas-stage {
+  position: relative;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 24px;
+  background: var(--paper);
+}
+
+.annotation-editor {
+  position: absolute;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border: 2px solid rgba(31, 63, 150, 0.55);
+  border-radius: 12px;
+  background: rgba(255, 254, 251, 0.97);
+  box-shadow: 0 12px 24px rgba(19, 32, 57, 0.16);
+  resize: none;
+  overflow: hidden;
+  z-index: 2;
+}
+
+@media (max-width: 960px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    order: 2;
+  }
+
+  .board-wrap {
+    order: 1;
+  }
+}

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PMI Isometric Plotter</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="panel">
+        <div class="brand-lockup">
+          <img class="logo-card" src="./pmi001-2.png" alt="PMI Premier Mechanical Installations logo" />
+          <div>
+            <p class="eyebrow">Digital Plotting</p>
+            <h1>Isometric Drawing Board</h1>
+            <p class="lede">
+              Draw directly onto branded isometric paper with line snapping, quick edits,
+              and a one-click image export.
+            </p>
+          </div>
+        </div>
+
+        <section class="control-group">
+          <label>Tool</label>
+          <div class="segmented-control" role="group" aria-label="Drawing tool">
+            <button id="lineModeButton" type="button" class="tool-button active">Line</button>
+            <button id="textModeButton" type="button" class="tool-button secondary">Text</button>
+          </div>
+        </section>
+
+        <section class="control-group">
+          <label for="strokeColor">Line colour</label>
+          <input id="strokeColor" type="color" value="#ea580c" />
+        </section>
+
+        <section class="control-group">
+          <label for="strokeWidth">Line width</label>
+          <input id="strokeWidth" type="range" min="1" max="6" step="0.5" value="2.5" />
+          <output id="strokeWidthValue">2.5 px</output>
+        </section>
+
+        <section id="textControls" class="control-group">
+          <label for="textColor">Text colour</label>
+          <input id="textColor" type="color" value="#132039" />
+
+          <label for="fontSize">Font size</label>
+          <input id="fontSize" type="range" min="10" max="36" step="1" value="16" />
+          <output id="fontSizeValue">16 px</output>
+
+          <label for="fontFamily">Font</label>
+          <select id="fontFamily">
+            <option value='"Avenir Next", "Trebuchet MS", sans-serif'>Avenir</option>
+            <option value='Georgia, "Times New Roman", serif'>Georgia</option>
+            <option value='"Arial Black", Arial, sans-serif'>Arial Black</option>
+            <option value='"Courier New", monospace'>Courier New</option>
+          </select>
+        </section>
+
+        <section class="control-group toggle-group">
+          <label class="toggle">
+            <input id="showNodes" type="checkbox" checked />
+            <span>Show snap points</span>
+          </label>
+          <label class="toggle">
+            <input id="showGuides" type="checkbox" checked />
+            <span>Show live guide</span>
+          </label>
+        </section>
+
+        <section class="actions">
+          <button id="undoButton" type="button">Undo Last Action</button>
+          <button id="clearButton" type="button" class="secondary">Clear Drawing</button>
+          <button id="exportButton" type="button" class="primary">Export PNG</button>
+        </section>
+
+        <section class="help">
+          <h2>How it works</h2>
+          <p>Line mode: click one grid intersection to start a segment, then click a second point to place it.</p>
+          <p>Text mode: click anywhere on the sheet and start typing directly on the page.</p>
+          <p>Select a label to edit it again, or drag the handle above it to rotate.</p>
+          <p>Everything snaps to the isometric lattice so notes and lines stay aligned to the sheet.</p>
+          <p>Use <kbd>Esc</kbd> to cancel a pending segment.</p>
+        </section>
+      </aside>
+
+      <main class="board-wrap">
+        <div class="paper-frame">
+          <div id="canvasStage" class="canvas-stage">
+            <canvas id="plotCanvas" width="1195" height="1684" aria-label="Isometric plotting paper"></canvas>
+            <textarea id="annotationEditor" class="annotation-editor" rows="1" hidden></textarea>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

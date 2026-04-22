@@ -1,0 +1,16 @@
+{
+  "segments": [
+    { "from": [6, 6], "to": [11, 6], "stroke": "#EA580C", "width": 2.2 },
+    { "from": [6, 6], "to": [6, 11], "stroke": "#0F766E", "width": 2.2 },
+    { "from": [6, 6], "to": [11, 1], "stroke": "#1D4ED8", "width": 2.2 }
+  ],
+  "polylines": [
+    { "points": [[14, 10], [14, 14], [18, 14], [18, 10], [14, 10]], "stroke": "#C026D3", "width": 1.8 }
+  ],
+  "branding": {
+    "enabled": true,
+    "x": 18,
+    "y": 14,
+    "width": 112
+  }
+}
