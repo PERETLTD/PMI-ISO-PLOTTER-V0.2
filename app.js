@@ -7,6 +7,7 @@ const strokeColorInput = document.getElementById("strokeColor");
 const strokeWidthInput = document.getElementById("strokeWidth");
 const strokeWidthValue = document.getElementById("strokeWidthValue");
 const lineModeButton = document.getElementById("lineModeButton");
+const lassoModeButton = document.getElementById("lassoModeButton");
 const textModeButton = document.getElementById("textModeButton");
 const textControls = document.getElementById("textControls");
 const textColorInput = document.getElementById("textColor");
@@ -41,6 +42,14 @@ const state = {
   lineChainPoint: null,
   hoverPoint: null,
   tool: "line",
+  selectedSegmentIds: [],
+  clipboardSegments: [],
+  clipboardPasteCount: 0,
+  lassoPath: [],
+  lassoPointerId: null,
+  selectionDragPointerId: null,
+  selectionDragStart: null,
+  selectionDragDelta: { u: 0, v: 0 },
   history: [],
   activeAnnotationId: null,
   editingAnnotationId: null,
@@ -49,7 +58,8 @@ const state = {
   pendingDragAnnotationId: null,
   pointerDownPoint: null,
   dragOffset: { x: 0, y: 0 },
-  nextAnnotationId: 1
+  nextAnnotationId: 1,
+  nextSegmentId: 1
 };
 
 const logoImage = new Image();
@@ -145,6 +155,95 @@ function getCanvasPoint(event) {
     x: ((event.clientX - rect.left) / rect.width) * canvas.width,
     y: ((event.clientY - rect.top) / rect.height) * canvas.height
   };
+}
+
+function quantizeGridValue(value) {
+  return Math.round(value * 2) / 2;
+}
+
+function canvasToGrid(point) {
+  const v = (point.x - page.marginLeft) / step.diagonalX;
+  const u = (point.y - page.marginTop - v * step.diagonalY) / step.vertical;
+  return { u, v };
+}
+
+function cloneGridPoint(point) {
+  return [point[0], point[1]];
+}
+
+function translateGridPoint(point, delta) {
+  return [point[0] + delta.u, point[1] + delta.v];
+}
+
+function isSelectionDragging() {
+  return state.selectionDragPointerId != null;
+}
+
+function isSegmentSelected(segmentId) {
+  return state.selectedSegmentIds.includes(segmentId);
+}
+
+function getRenderedSegmentGridPoints(segment) {
+  if (isSelectionDragging() && isSegmentSelected(segment.id)) {
+    return {
+      from: translateGridPoint(segment.from, state.selectionDragDelta),
+      to: translateGridPoint(segment.to, state.selectionDragDelta)
+    };
+  }
+
+  return {
+    from: cloneGridPoint(segment.from),
+    to: cloneGridPoint(segment.to)
+  };
+}
+
+function createSegmentRecord(from, to, overrides = {}) {
+  return {
+    id: state.nextSegmentId++,
+    from: cloneGridPoint(from),
+    to: cloneGridPoint(to),
+    color: overrides.color ?? strokeColorInput.value,
+    width: overrides.width ?? Number(strokeWidthInput.value)
+  };
+}
+
+function getSelectedSegments() {
+  return state.segments.filter((segment) => isSegmentSelected(segment.id));
+}
+
+function getSelectionBounds() {
+  const selectedSegments = getSelectedSegments();
+  if (!selectedSegments.length) {
+    return null;
+  }
+
+  const points = [];
+  for (const segment of selectedSegments) {
+    const { from, to } = getRenderedSegmentGridPoints(segment);
+    points.push(gridToCanvas(from), gridToCanvas(to));
+  }
+
+  const padding = 18;
+  const minX = Math.min(...points.map((point) => point.x)) - padding;
+  const maxX = Math.max(...points.map((point) => point.x)) + padding;
+  const minY = Math.min(...points.map((point) => point.y)) - padding;
+  const maxY = Math.max(...points.map((point) => point.y)) + padding;
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY
+  };
+}
+
+function hitTestSelectionBounds(x, y) {
+  const bounds = getSelectionBounds();
+  if (!bounds) {
+    return false;
+  }
+
+  return x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height;
 }
 
 function getAnnotationById(id) {
@@ -285,19 +384,76 @@ function drawBranding() {
 
 function drawSegments() {
   for (const segment of state.segments) {
-    const a = gridToCanvas(segment.from);
-    const b = gridToCanvas(segment.to);
+    const { from, to } = getRenderedSegmentGridPoints(segment);
+    const a = gridToCanvas(from);
+    const b = gridToCanvas(to);
+    const isSelected = isSegmentSelected(segment.id);
     ctx.save();
+    if (isSelected) {
+      ctx.strokeStyle = "rgba(31, 63, 150, 0.22)";
+      ctx.lineWidth = segment.width + 10;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
     ctx.strokeStyle = segment.color;
-    ctx.lineWidth = segment.width;
+    ctx.lineWidth = isSelected ? segment.width + 0.8 : segment.width;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
+
+    if (isSelected) {
+      ctx.strokeStyle = "#1f3f96";
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
     ctx.restore();
   }
+}
+
+function drawSelectionBounds() {
+  const bounds = getSelectionBounds();
+  if (!bounds) {
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = "rgba(31, 63, 150, 0.05)";
+  ctx.strokeStyle = "#1f3f96";
+  ctx.lineWidth = 1.8;
+  ctx.setLineDash([9, 7]);
+  ctx.beginPath();
+  ctx.roundRect(bounds.x, bounds.y, bounds.width, bounds.height, 14);
+  ctx.fill();
+  ctx.stroke();
+
+  const handleSize = 8;
+  const corners = [
+    [bounds.x, bounds.y],
+    [bounds.x + bounds.width, bounds.y],
+    [bounds.x + bounds.width, bounds.y + bounds.height],
+    [bounds.x, bounds.y + bounds.height]
+  ];
+  ctx.fillStyle = "#fffefb";
+  ctx.strokeStyle = "#1f3f96";
+  ctx.setLineDash([]);
+  for (const [x, y] of corners) {
+    ctx.beginPath();
+    ctx.rect(x - handleSize / 2, y - handleSize / 2, handleSize, handleSize);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawAnnotations() {
@@ -369,6 +525,30 @@ function drawPendingGuide() {
   ctx.restore();
 }
 
+function drawLasso() {
+  if (state.lassoPath.length < 2) {
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = "rgba(31, 63, 150, 0.08)";
+  ctx.strokeStyle = "#1f3f96";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.moveTo(state.lassoPath[0].x, state.lassoPath[0].y);
+  for (let index = 1; index < state.lassoPath.length; index += 1) {
+    const point = state.lassoPath[index];
+    ctx.lineTo(point.x, point.y);
+  }
+  if (state.tool === "lasso" && state.lassoPointerId != null) {
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawNodes() {
   if (!showNodesInput.checked) {
     return;
@@ -405,19 +585,172 @@ function drawNodes() {
 function redraw() {
   drawBackground();
   drawSegments();
+  drawSelectionBounds();
   drawAnnotations();
   drawPendingGuide();
+  drawLasso();
   drawNodes();
 }
 
 function addSegment(from, to) {
-  state.segments.push({
-    from,
-    to,
-    color: strokeColorInput.value,
-    width: Number(strokeWidthInput.value)
-  });
-  state.history.push({ type: "segment" });
+  const segment = createSegmentRecord(from, to);
+  state.segments.push(segment);
+  state.history.push({ type: "segmentsAdded", ids: [segment.id] });
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || Number.EPSILON) + xi;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function orientation(a, b, c) {
+  const value = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+  if (Math.abs(value) < 1e-6) {
+    return 0;
+  }
+  return value > 0 ? 1 : 2;
+}
+
+function onSegment(a, b, c) {
+  return (
+    b.x <= Math.max(a.x, c.x) + 1e-6 &&
+    b.x + 1e-6 >= Math.min(a.x, c.x) &&
+    b.y <= Math.max(a.y, c.y) + 1e-6 &&
+    b.y + 1e-6 >= Math.min(a.y, c.y)
+  );
+}
+
+function segmentsIntersect(a1, a2, b1, b2) {
+  const o1 = orientation(a1, a2, b1);
+  const o2 = orientation(a1, a2, b2);
+  const o3 = orientation(b1, b2, a1);
+  const o4 = orientation(b1, b2, a2);
+
+  if (o1 !== o2 && o3 !== o4) {
+    return true;
+  }
+
+  if (o1 === 0 && onSegment(a1, b1, a2)) return true;
+  if (o2 === 0 && onSegment(a1, b2, a2)) return true;
+  if (o3 === 0 && onSegment(b1, a1, b2)) return true;
+  if (o4 === 0 && onSegment(b1, a2, b2)) return true;
+
+  return false;
+}
+
+function segmentIntersectsPolygon(segment, polygon) {
+  const fromPoint = gridToCanvas(segment.from);
+  const toPoint = gridToCanvas(segment.to);
+  const midpoint = {
+    x: (fromPoint.x + toPoint.x) / 2,
+    y: (fromPoint.y + toPoint.y) / 2
+  };
+
+  if (pointInPolygon(fromPoint, polygon) || pointInPolygon(toPoint, polygon) || pointInPolygon(midpoint, polygon)) {
+    return true;
+  }
+
+  for (let index = 0; index < polygon.length; index += 1) {
+    const edgeStart = polygon[index];
+    const edgeEnd = polygon[(index + 1) % polygon.length];
+    if (segmentsIntersect(fromPoint, toPoint, edgeStart, edgeEnd)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function applyLassoSelection() {
+  if (state.lassoPath.length < 3) {
+    state.selectedSegmentIds = [];
+    state.lassoPath = [];
+    redraw();
+    return;
+  }
+
+  state.selectedSegmentIds = state.segments
+    .filter((segment) => segmentIntersectsPolygon(segment, state.lassoPath))
+    .map((segment) => segment.id);
+  state.lassoPath = [];
+  redraw();
+}
+
+function copySelection() {
+  const selectedSegments = getSelectedSegments();
+  if (!selectedSegments.length) {
+    return false;
+  }
+
+  state.clipboardSegments = selectedSegments.map((segment) => ({
+    from: cloneGridPoint(segment.from),
+    to: cloneGridPoint(segment.to),
+    color: segment.color,
+    width: segment.width
+  }));
+  state.clipboardPasteCount = 0;
+  return true;
+}
+
+function pasteSelection() {
+  if (!state.clipboardSegments.length) {
+    return false;
+  }
+
+  state.clipboardPasteCount += 1;
+  const delta = { u: state.clipboardPasteCount, v: state.clipboardPasteCount };
+  const newSegments = state.clipboardSegments.map((segment) =>
+    createSegmentRecord(translateGridPoint(segment.from, delta), translateGridPoint(segment.to, delta), segment)
+  );
+
+  state.segments.push(...newSegments);
+  state.selectedSegmentIds = newSegments.map((segment) => segment.id);
+  state.history.push({ type: "segmentsAdded", ids: state.selectedSegmentIds.slice() });
+  redraw();
+  return true;
+}
+
+function commitSelectionDrag() {
+  if (!isSelectionDragging()) {
+    return;
+  }
+
+  const delta = { ...state.selectionDragDelta };
+  const selectedSegments = getSelectedSegments();
+  const movedSegments = [];
+
+  if (delta.u !== 0 || delta.v !== 0) {
+    for (const segment of selectedSegments) {
+      movedSegments.push({
+        id: segment.id,
+        from: cloneGridPoint(segment.from),
+        to: cloneGridPoint(segment.to)
+      });
+      segment.from = translateGridPoint(segment.from, delta);
+      segment.to = translateGridPoint(segment.to, delta);
+    }
+
+    if (movedSegments.length) {
+      state.history.push({ type: "segmentsMoved", segments: movedSegments, delta });
+      state.clipboardPasteCount = 0;
+    }
+  }
+
+  state.selectionDragPointerId = null;
+  state.selectionDragStart = null;
+  state.selectionDragDelta = { u: 0, v: 0 };
 }
 
 function createAnnotation(point) {
@@ -527,16 +860,41 @@ function hitTestAnnotation(x, y) {
 
 function updateToolUI() {
   const isLine = state.tool === "line";
+  const isLasso = state.tool === "lasso";
+  const isText = state.tool === "text";
   lineModeButton.classList.toggle("active", isLine);
-  textModeButton.classList.toggle("active", !isLine);
+  lassoModeButton.classList.toggle("active", isLasso);
+  textModeButton.classList.toggle("active", isText);
   lineModeButton.classList.toggle("secondary", !isLine);
-  textModeButton.classList.toggle("secondary", isLine);
-  textControls.hidden = isLine;
+  lassoModeButton.classList.toggle("secondary", !isLasso);
+  textModeButton.classList.toggle("secondary", !isText);
+  textControls.hidden = !isText;
 }
 
 canvas.addEventListener("pointermove", (event) => {
   const point = getCanvasPoint(event);
-  state.hoverPoint = snapPoint(point.x, point.y);
+  state.hoverPoint = state.tool === "line" ? snapPoint(point.x, point.y) : null;
+
+  if (state.selectionDragPointerId === event.pointerId && state.selectionDragStart) {
+    const currentGrid = canvasToGrid(point);
+    state.selectionDragDelta = {
+      u: quantizeGridValue(currentGrid.u - state.selectionDragStart.u),
+      v: quantizeGridValue(currentGrid.v - state.selectionDragStart.v)
+    };
+    canvas.style.cursor = "grabbing";
+    redraw();
+    return;
+  }
+
+  if (state.tool === "lasso" && state.lassoPointerId === event.pointerId) {
+    const lastPoint = state.lassoPath[state.lassoPath.length - 1];
+    if (!lastPoint || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) > 4) {
+      state.lassoPath.push({ x: point.x, y: point.y });
+      redraw();
+    }
+    canvas.style.cursor = "crosshair";
+    return;
+  }
 
   if (state.rotatingAnnotationId != null) {
     const annotation = getAnnotationById(state.rotatingAnnotationId);
@@ -590,7 +948,14 @@ canvas.addEventListener("pointermove", (event) => {
       canvas.style.cursor = "default";
     }
   } else {
-    canvas.style.cursor = state.hoverPoint ? "crosshair" : "default";
+    canvas.style.cursor =
+      state.tool === "lasso" && hitTestSelectionBounds(point.x, point.y)
+        ? "move"
+        : state.tool === "lasso"
+          ? "crosshair"
+          : state.hoverPoint
+            ? "crosshair"
+            : "default";
   }
   redraw();
 });
@@ -605,6 +970,26 @@ canvas.addEventListener("pointerleave", () => {
 
 canvas.addEventListener("pointerdown", (event) => {
   const point = getCanvasPoint(event);
+
+  if (state.tool === "lasso") {
+    finishEditingAnnotation();
+    state.pendingPoint = null;
+    state.lineChainPoint = null;
+    state.activeAnnotationId = null;
+    if (hitTestSelectionBounds(point.x, point.y)) {
+      state.selectionDragPointerId = event.pointerId;
+      state.selectionDragStart = canvasToGrid(point);
+      state.selectionDragDelta = { u: 0, v: 0 };
+      canvas.style.cursor = "grabbing";
+      redraw();
+      return;
+    }
+    state.lassoPointerId = event.pointerId;
+    state.lassoPath = [{ x: point.x, y: point.y }];
+    canvas.style.cursor = "crosshair";
+    redraw();
+    return;
+  }
 
   if (state.tool === "text") {
     const hit = hitTestAnnotation(point.x, point.y);
@@ -680,6 +1065,13 @@ canvas.addEventListener("dblclick", (event) => {
 });
 
 window.addEventListener("pointerup", () => {
+  if (state.selectionDragPointerId != null) {
+    commitSelectionDrag();
+  }
+  if (state.lassoPointerId != null) {
+    state.lassoPointerId = null;
+    applyLassoSelection();
+  }
   if (state.rotatingAnnotationId != null) {
     state.rotatingAnnotationId = null;
   }
@@ -698,11 +1090,31 @@ window.addEventListener("pointerup", () => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "c") {
+    if (copySelection()) {
+      event.preventDefault();
+      redraw();
+    }
+    return;
+  }
+
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "v") {
+    if (pasteSelection()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
   if (event.key === "Escape") {
     finishEditingAnnotation();
     state.pendingPoint = null;
     state.lineChainPoint = null;
     state.activeAnnotationId = null;
+    state.selectionDragPointerId = null;
+    state.selectionDragStart = null;
+    state.selectionDragDelta = { u: 0, v: 0 };
+    state.lassoPointerId = null;
+    state.lassoPath = [];
     state.pendingDragAnnotationId = null;
     state.draggingAnnotationId = null;
     state.pointerDownPoint = null;
@@ -752,6 +1164,15 @@ lineModeButton.addEventListener("click", () => {
   redraw();
 });
 
+lassoModeButton.addEventListener("click", () => {
+  finishEditingAnnotation();
+  state.pendingPoint = null;
+  state.lineChainPoint = null;
+  state.tool = "lasso";
+  updateToolUI();
+  redraw();
+});
+
 textModeButton.addEventListener("click", () => {
   state.pendingPoint = null;
   state.lineChainPoint = null;
@@ -770,8 +1191,26 @@ undoButton.addEventListener("click", () => {
     return;
   }
 
-  if (lastAction.type === "segment") {
-    state.segments.pop();
+  if (lastAction.type === "segmentsAdded") {
+    const idsToRemove = new Set(lastAction.ids);
+    state.segments = state.segments.filter((segment) => !idsToRemove.has(segment.id));
+    state.selectedSegmentIds = state.selectedSegmentIds.filter((segmentId) => !idsToRemove.has(segmentId));
+  }
+
+  if (lastAction.type === "segmentsMoved") {
+    const originalById = new Map(lastAction.segments.map((segment) => [segment.id, segment]));
+    state.segments = state.segments.map((segment) => {
+      const original = originalById.get(segment.id);
+      if (!original) {
+        return segment;
+      }
+      return {
+        ...segment,
+        from: cloneGridPoint(original.from),
+        to: cloneGridPoint(original.to)
+      };
+    });
+    state.selectedSegmentIds = lastAction.segments.map((segment) => segment.id);
   }
 
   if (lastAction.type === "annotation") {
@@ -794,6 +1233,14 @@ clearButton.addEventListener("click", () => {
   state.draggingAnnotationId = null;
   state.pendingDragAnnotationId = null;
   state.pointerDownPoint = null;
+  state.selectedSegmentIds = [];
+  state.clipboardSegments = [];
+  state.clipboardPasteCount = 0;
+  state.lassoPath = [];
+  state.lassoPointerId = null;
+  state.selectionDragPointerId = null;
+  state.selectionDragStart = null;
+  state.selectionDragDelta = { u: 0, v: 0 };
   redraw();
 });
 

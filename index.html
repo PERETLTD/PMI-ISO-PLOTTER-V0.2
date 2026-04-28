@@ -25,6 +25,7 @@
           <label>Tool</label>
           <div class="segmented-control" role="group" aria-label="Drawing tool">
             <button id="lineModeButton" type="button" class="tool-button active">Line</button>
+            <button id="lassoModeButton" type="button" class="tool-button secondary">Lasso</button>
             <button id="textModeButton" type="button" class="tool-button secondary">Text</button>
           </div>
         </section>
@@ -77,11 +78,12 @@
         <section class="help">
           <h2>How it works</h2>
           <p>Line mode: click one grid intersection to start a segment, then click a second point to place it.</p>
+          <p>Lasso mode: drag a freehand loop around plotted lines to select them, then drag the selection box to move them.</p>
+          <p>Use <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>C</kbd> and <kbd>V</kbd> to copy and paste the selected lines.</p>
           <p>Text mode: click anywhere on the sheet and start typing directly on the page.</p>
           <p>Select a label to edit it again, or drag the handle above it to rotate.</p>
           <p>Everything snaps to the isometric lattice so notes and lines stay aligned to the sheet.</p>
           <p>Use <kbd>Esc</kbd> to cancel a pending segment.</p>
-          <p>All rights reserved ©PERETLTD</p>
         </section>
       </aside>
 
